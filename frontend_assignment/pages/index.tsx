@@ -1,13 +1,29 @@
 import detectEthereumProvider from "@metamask/detect-provider"
 import { Strategy, ZkIdentity } from "@zk-kit/identity"
 import { generateMerkleProof, Semaphore } from "@zk-kit/protocols"
-import { providers } from "ethers"
+import { providers, Contract } from "ethers"
 import Head from "next/head"
 import React from "react"
 import styles from "../styles/Home.module.css"
+import { useForm } from "react-hook-form";
+import { object, string, number, date, InferType } from 'yup';
+import Greeter from "artifacts/contracts/Greeters.sol/Greeters.json"
+
+let userSchema = object({ 
+  name: string().required(),
+  age: number().required().positive().integer(),
+  address: string().required(),
+})
 
 export default function Home() {
     const [logs, setLogs] = React.useState("Connect your wallet and greet!")
+    const [logs2, setLogs2] = React.useState("Greeting: ")
+
+    const { register, handleSubmit, watch, formState: { errors } } = useForm();
+    const onSubmit = async function (data) {
+        const validatedData = await userSchema.validate(data);
+        console.log(validatedData);
+    };
 
     async function greet() {
         setLogs("Creating your Semaphore identity...")
@@ -17,6 +33,14 @@ export default function Home() {
         await provider.request({ method: "eth_requestAccounts" })
 
         const ethersProvider = new providers.Web3Provider(provider)
+
+        const localProvider = new providers.JsonRpcProvider("http://localhost:8545")
+        const contract = new Contract("0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", Greeter.abi).connect(ethersProvider)
+        contract.on("NewGreeting", (greeting) => {
+            console.log(greeting)
+            setLogs2(greeting)
+        })
+
         const signer = ethersProvider.getSigner()
         const message = await signer.signMessage("Sign this message to create your identity!")
 
@@ -73,6 +97,17 @@ export default function Home() {
                 <p className={styles.description}>A simple Next.js/Hardhat privacy application with Semaphore.</p>
 
                 <div className={styles.logs}>{logs}</div>
+
+                <div className={styles.greeting}>{logs2}</div>
+
+                <form onSubmit={handleSubmit(onSubmit)}>
+                  {/* register your input into the hook by invoking the "register" function */}
+                  <input defaultValue="name" {...register("name")} />
+                  <input defaultValue="age" {...register("age")} />
+                  <input defaultValue="address" {...register("address")} />
+
+                  <input type="submit" />
+                </form>
 
                 <div onClick={() => greet()} className={styles.button}>
                     Greet
